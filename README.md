@@ -26,10 +26,15 @@ preflightChecks_minty script provides the output of following checks:
   <li>Give that file executable permissions</li>
   <code> chmod +x preflightChecks_minty</code>
 </ol>
-  
+<Strong>Don't refresh stack before executing preflightChecks_minty as it will refresh the stack on it'w own;)<strong>
 <p>
 <h3> Usage: </h3> 
   <code> ./preflightChecks_minty -s StackName</code>
+<strong>Important Notes:</strong> 
+<ol>
+<li>As of now this script will only work in Tower directory
+<li>Please verify all the output before pasting in JIRA. This is just a script, it's not as smart as us ;) 
+ </ol>
 </p>
 
 ![preflight_output](https://user-images.githubusercontent.com/39366638/45172782-fa6f5580-b223-11e8-8999-ba0b1b5d7f16.gif)
