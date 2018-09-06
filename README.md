@@ -40,4 +40,4 @@ preflightChecks_minty script provides the output of following checks:
 <li>As of now this script will only work in Tower directory
 <li>Please verify all the output before pasting in JIRA. This is just a script, it's not as smart as us :wink:
  </ol>
-Problems/Suggestions? Feel free to open an issue/PR! </p>
+<h2>Problems/Suggestions? Feel free to open an issue/PR! </h2></p>
