@@ -1,0 +1,184 @@
+#############################################################################################
+#                                                                                           #
+# Author:  Jagdish V Patil @ Crest Data System                                             #
+# Date:    6th Sept 2018                                                                     #
+# Version: 1.0                                                                              #
+# Help:-                                                                                    #
+# ./preflightChecks_minty -s StackName
+#                                                                                           #
+#############################################################################################
+#!/usr/bin/env bash
+
+while getopts 's:' option; do
+  case "$option" in
+		s) stack=$OPTARG
+			;;
+esac
+done
+
+G='\033[0;32m'
+R='\033[0;31m'
+NC='\033[0m' 
+BL='\033[;34m'
+function diskSpaceCheck() 
+{
+    list=$1[@]
+    a=("${!list}")
+    for i in "${a[@]}" ; do
+    echo -e "For ${R}$i${NC}:"
+    limit='*'
+    range=$i$limit
+    ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "df -h" --sudo -U splunk -l "$range"
+    ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "df -h" --sudo -U splunk -l "$range" | grep "/dev/mapper" | awk -v N=5 '{print $N}' | sed "s/%//g" > test26.txt
+    ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "df -h" --sudo -U splunk -l "$range" | grep "/dev/xvda" | awk -v N=5 '{print $N}' | sed "s/%//g" > test27.txt
+    ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "df -h" --sudo -U splunk -l "$range" | grep -v '/dev/xvda'| grep "/dev/xvd" | awk -v N=5 '{print $N}' | sed "s/%//g" > test28.txt
+	if [[ `cat test26.txt | sed "s/%//g"` -gt 75 ]]
+	then 
+	echo -e "{color:red}${R}Disk Space is above 75% on /dev/mapper for instance $i, Please remove unnecessary files before performing Minty upgrade${NC}{color}\n"  >> diskSpaceIssues.txt
+	elif [[ `cat test27.txt | sed "s/%//g"` -gt 75 ]]
+	then
+	echo -e "{color:red}${R}Disk Space is above 75% on /dev/xvda for instance $i, Please remove unnecessary files before performing Minty upgrade${NC}\n{color}"  >> diskSpaceIssues.txt
+	elif [[ `cat test28.txt | sed "s/%//g"` -gt 75 ]]
+	then
+	echo -e "{color:red}${R}Disk Space is above 75% on /dev/xvd for instance $i, Please remove unnecessary files before performing Minty upgrade${NC}\n{color}"  >> diskSpaceIssues.txt
+	fi
+	rm -rf test26.txt
+	rm -rf test27.txt
+	rm -rf test28.txt
+	done
+}
+echo -e "${BL}Refreshing Stack $stack..."
+/${HOME}/cloud/${AWS_KEY_NAME}/cloud-ops/ansible/hosts --refresh-cache --stack "$stack" | grep "$stack.splunkcloud.com" | sed "s/\"//g" | sed "s/,//g" | sed '/tag_FQDN_/d' | sed '/ec2_tag_FQDN/d' | sed '/: {/d' | sort -u | tr -d ' ' | awk '!a[$0]++' > test23.txt
+echo -e "*Preflight Checks*:\n"
+echo -e "${R}1) *Smoke Test Result*:${NC}"
+echo "{code:java}"
+echo -e "ansible-playbook stack_smoketest.yml -e stack="${stack}""
+ansible-playbook stack_smoketest.yml -e stack="$stack"
+if [ $? -eq 0 ]
+then
+	SMOKE_TEST=1;
+else
+	SMOKE_TEST=0;
+fi
+echo -e "{code}\n"
+echo -e "${R}2) *Disk Space*:${NC}"
+echo "{code:java}"
+input=$(cat test23.txt)
+instances=(${input//'\n'/ })
+diskSpaceCheck instances
+echo -e "{code}\n"
+echo -e "${R}3) *Current Splunk version*:${NC}"
+echo -e "{code:java}"
+echo -e "ansible 'tag_Stack_${stack}' -m shell -a "/opt/splunk/bin/splunk version" --sudo -U splunk"
+ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "/opt/splunk/bin/splunk version" --sudo -U splunk
+echo -e "{code}\n"
+
+echo -e "${R}4) *Verified that Splunk is running as Splunk user*:${NC}" 
+echo -e "{code:java}"
+echo -e "ansible 'tag_Stack_${stack}' -m shell -a "ls -la /opt/splunk/var/run/splunk/splunkd.pid" --sudo -U splunk"
+ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "ls -la /opt/splunk/var/run/splunk/splunkd.pid" --sudo -U splunk 
+echo -e "{code}\n"
+echo -e "${R}5) *Admin Password Status*:${NC}"
+echo -e "{code:java}"
+echo -e "ansible 'tag_Stack_${stack}' --extra-vars "@./secure_vars/tag_Stack_"$(echo $stack)"/secure.yml" -m shell -a '/opt/splunk/bin/splunk search "index=_fake et=-m lt=now" -auth admin:{{ stack_password }}'" --sudo -U splunk
+ansible 'tag_Stack_'"$(echo $stack)"'' --extra-vars "@./secure_vars/tag_Stack_"$(echo $stack)"/secure.yml" -m shell -a '/opt/splunk/bin/splunk search "index=_fake et=-m lt=now" -auth admin:{{ stack_password }}' --sudo -U splunk
+echo -e "{code}\n"
+echo -e "${R}6) *Premium Apps Status*:${NC}"
+ad="$(whoami)"
+ansible-playbook stack_add_self.yml -e "stack="$stack" ops_users="$ad"" >> /dev/null
+	FLAG=n;	ES_FLAG=n; ITSI_FLAG=n; EX_FLAG=n; VM_FLAG=n;
+	#ES
+	ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "ls -la /opt/splunk/etc/apps/ | grep "SplunkEnterpriseSecuritySuite"" --sudo -U splunk -l "sh*" | sed '/FAILED | rc=true/d' | sed '/FAILED/d' | sed '/^$/d'| sed 's/ | success | rc=false >>/ /g'| sed '/splunk splunk/d' | sed "s/.${stack}.splunkcloud.com//g" | sed "s/| success | rc=0 >>//g" | sed "s/ //g" > es.txt
+	es="$(cat es.txt)"
+	#ITSI
+	ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "ls -la /opt/splunk/etc/apps/ | grep "itsi"" --sudo -U splunk -l "sh*" | sed '/FAILED | rc=true/d' | sed '/FAILED/d' | sed '/^$/d'| sed 's/ | success | rc=false >>/ /g'| sed '/splunk splunk/d' | sed "s/.${stack}.splunkcloud.com//g" | sed "s/| success | rc=0 >>//g" | sed "s/ //g" > itsi.txt
+	itsi="$(cat itsi.txt)"
+	#Exchange
+	ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "ls -la /opt/splunk/etc/apps/ | grep "splunk_app_microsoft_exchange"" --sudo -U splunk -l "sh*" | sed '/FAILED | rc=true/d' | sed '/FAILED/d' | sed '/^$/d'| sed 's/ | success | rc=false >>/ /g'| sed '/splunk splunk/d' | sed "s/.${stack}.splunkcloud.com//g" | sed "s/| success | rc=0 >>//g" | sed "s/ //g" > ex.txt
+	ex="$(cat ex.txt)"
+	#VMWare
+	ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "ls -la /opt/splunk/etc/apps/ | grep "splunk_for_vmware"" --sudo -U splunk -l "sh*" | sed '/FAILED | rc=true/d' | sed '/FAILED/d' | sed '/^$/d'| sed 's/ | success | rc=false >>/ /g'| sed '/splunk splunk/d' | sed "s/.${stack}.splunkcloud.com//g" | sed "s/| success | rc=0 >>//g" | sed "s/ //g" > vm.txt
+	vm="$(cat vm.txt)"
+
+	if [[ "$es" = *"sh"* ]];
+	then
+		ES_FLAG=y; FLAG=y;
+	fi
+	if [[ "$itsi" = *"sh"* ]];
+	then
+		ITSI_FLAG=y; FLAG=y;
+	fi
+	if [[ "$ex" = *"sh"* ]];
+	then
+		EX_FLAG=y; FLAG=y;
+	fi
+	if [[ "$vm" = *"sh"* ]];
+	then
+		VM_FLAG=y; FLAG=y;
+	fi
+	if [[ "$FLAG" = "n" ]]
+	then
+		echo -e "No Premium Apps on stack $stack"
+	fi
+	if [[ "$FLAG" = "y" ]]
+	then
+		echo -e "List of the *Premium Apps* on stack:*$stack*"
+	fi
+	if [[ "$ES_FLAG" = "y" ]]
+	then
+		es_version="$(ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "cat /opt/splunk/etc/apps/SplunkEnterpriseSecuritySuite/default/app.conf | grep version" --sudo -U splunk -l "sh*" | grep "version")"
+		echo -e "* ES, $es_version"
+	fi
+	if [[ "$ITSI_FLAG" = "y" ]]
+	then
+		itsi_version="$(ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "cat /opt/splunk/etc/apps/itsi/default/app.conf | grep version" --sudo -U splunk -l "sh*" | grep "version")"
+		echo -e "* ITSI, $itsi_version"
+	fi
+	if [[ "$EX_FLAG" = "y" ]]
+	then
+		ex_version="$(ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "cat /opt/splunk/etc/apps/splunk_app_microsoft_exchange/default/app.conf | grep version" --sudo -U splunk -l "sh*" | grep "version")"
+		echo -e "* Exchange, $ex_version"
+	fi
+	if [[ "$VM_FLAG" = "y" ]]
+	then
+		vm_version="$(ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "cat /opt/splunk/etc/apps/splunk_for_vmware/default/app.conf | grep version" --sudo -U splunk -l "sh*" | grep "version")"
+		echo -e "* VMWare, $vm_version"
+	fi
+	rm -rf es.txt
+	rm -rf itsi.txt
+	rm -rf ex.txt
+	rm -rf vm.txt
+	rm -rf test23.txt
+#---------------
+echo -e "${R}7) *EBS Attachment*:${NC}"
+echo -e "${R} Open below URL and attach screenshot accrodingly:"
+echo -e "${BL}https://skynet-search.splunkcloud.com/en-GB/app/cloudops/stack_ebs_snapshot?form.stack=$stack \n"
+echo -e "${R}8) *Stack HEC Status*:${NC}"
+echo -e "${R} Open below URL and attach screenshot accrodingly:"
+echo -e "${BL}https://skynet-search.splunkcloud.com/en-GB/app/cloudops/stack_hec_status?form.stack=$stack \n"
+echo -e "${R}9) *Cluster-Status*:${NC}"
+echo -e "${R} Open below URL and attach screenshot accrodingly:"
+echo -e "${BL}https://internal-c0m1.$stack.splunkcloud.com:8443/en-GB/manager/system/clustering \n"
+echo -e "${R}10) *Stack Overview*:${NC}"
+echo -e "${R} Open below URL and attach screenshot accrodingly:${NC}"
+echo -e "${BL}https://skynet-search.splunkcloud.com/en-GB/app/cloudops/stack_overview?form.stack=$stack \n${NC}"
+
+echo -e "Smoke Test Summary:"
+if [ $SMOKE_TEST -eq 1 ]
+then
+	echo  -e "{color:red}${G}\033[5mPassed\033[0m${NC}{color}"
+elif [ $SMOKE_TEST -eq 0 ]
+then
+	echo  -e "{color:red}${R}\033[5mFailed (Please troubleshoot)\033[0m${NC}{color}"
+fi
+if [ -s diskSpaceIssues.txt ]
+then
+echo -e "Disk Space Summary:"
+cat diskSpaceIssues.txt
+rm -rf diskSpaceIssues.txt
+else
+	:
+fi
+echo -e "\n{color:red}*NOTE:Please Take latest Snapshot of c0m1,LM1 and SH(s)*{color}"
+echo -e "\n*RunBook to be followed*:\nhttps://confluence.splunk.com/display/CLOUDOPS/Minty+Upgrade+Execution+Steps"
+echo -e "\n${R}{color:red}---------------------------------WARNING!!!---------------------------------\n          Please Verify all the outputs before pasting in JIRA{color}"
