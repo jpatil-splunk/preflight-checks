@@ -26,7 +26,7 @@ preflightChecks_minty script provides the output of following checks:
   <li>Give that file executable permissions</li>
   <code> chmod +x preflightChecks_minty</code>
 </ol>
-<Strong>Don't refresh stack before executing preflightChecks_minty as it will refresh the stack on it'w own;)<strong>
+<Strong>Don't refresh stack before executing preflightChecks_minty as it will refresh the stack on it'w own:wink:<strong>
 <p>
 <h3> Usage: </h3> 
   <code> ./preflightChecks_minty -s StackName</code>
