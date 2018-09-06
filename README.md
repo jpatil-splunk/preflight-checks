@@ -2,7 +2,7 @@
 <h3> Introduction </h3>
 <p>As we all know that pre-flight check is very time-consuming process and every time a minty upgrade batch comes it takes a lot of time of SRE to manually perform the pre-flight checks and format the output of each check. To resolve this issue, I have created a bash script to automate all the checks for pre-flight checks as well as to format the output of all the checks as per JIRA format.
 
-After running following script SRE will just need to verify the output and copy and paste the output directly in JIRA as it will be pre-formatted ;) 
+After running following script SRE will just need to verify the output and copy and paste the output directly in JIRA as it will be pre-formatted :wink:
 
 preflightChecks_minty script provides the output of following checks:
 <ol type="1">
@@ -30,13 +30,14 @@ preflightChecks_minty script provides the output of following checks:
 <p>
 <h3> Usage: </h3> 
   <code> ./preflightChecks_minty -s StackName</code>
-<strong>Important Notes:</strong> 
-<ol>
-<li>As of now this script will only work in Tower directory
-<li>Please verify all the output before pasting in JIRA. This is just a script, it's not as smart as us ;) 
- </ol>
 </p>
 
 ![preflight_output](https://user-images.githubusercontent.com/39366638/45172782-fa6f5580-b223-11e8-8999-ba0b1b5d7f16.gif)
 
-Problems/Suggestions? Feel free to open an issue/PR!
+<p>
+<strong>Important Notes:</strong> 
+<ol>
+<li>As of now this script will only work in Tower directory
+<li>Please verify all the output before pasting in JIRA. This is just a script, it's not as smart as us :wink:
+ </ol>
+Problems/Suggestions? Feel free to open an issue/PR! </p>
