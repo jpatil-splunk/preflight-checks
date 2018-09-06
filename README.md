@@ -29,7 +29,7 @@ preflightChecks_minty script provides the output of following checks:
   
 <p>
 <h3> Usage: </h3> 
-  <code> ./preflightCheck_minty -s StackName</code>
+  <code> ./preflightChecks_minty -s StackName</code>
 </p>
 
 ![preflight_output](https://user-images.githubusercontent.com/39366638/45172782-fa6f5580-b223-11e8-8999-ba0b1b5d7f16.gif)
