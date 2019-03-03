@@ -32,23 +32,25 @@ function diskSpaceCheck()
     ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "df -h" --sudo -U splunk -l "$range" | grep "/dev/mapper" | awk -v N=5 '{print $N}' | sed "s/%//g" > test26.txt
     ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "df -h" --sudo -U splunk -l "$range" | grep "/dev/xvda" | awk -v N=5 '{print $N}' | sed "s/%//g" > test27.txt
     ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "df -h" --sudo -U splunk -l "$range" | grep -v '/dev/xvda'| grep "/dev/xvd" | awk -v N=5 '{print $N}' | sed "s/%//g" > test28.txt
-	if [[ `cat test26.txt | sed "s/%//g"` -gt 75 ]]
+	if [[ `cat test26.txt | sed "s/%//g"` -gt 90 ]]
 	then 
-	echo -e "{color:red}${R}Disk Space is above 75% on /dev/mapper for instance $i, Please remove unnecessary files before performing Minty upgrade${NC}{color}\n"  >> diskSpaceIssues.txt
-	elif [[ `cat test27.txt | sed "s/%//g"` -gt 75 ]]
+	echo -e "{color:red}${R}Disk Space is above 90% on /dev/mapper for instance $i, Please remove unnecessary files before performing Minty upgrade${NC}{color}\n"  >> diskSpaceIssues.txt
+	elif [[ `cat test27.txt | sed "s/%//g"` -gt 90 ]]
 	then
-	echo -e "{color:red}${R}Disk Space is above 75% on /dev/xvda for instance $i, Please remove unnecessary files before performing Minty upgrade${NC}\n{color}"  >> diskSpaceIssues.txt
-	elif [[ `cat test28.txt | sed "s/%//g"` -gt 75 ]]
+	echo -e "{color:red}${R}Disk Space is above 90% on /dev/xvda for instance $i, Please remove unnecessary files before performing Minty upgrade${NC}\n{color}"  >> diskSpaceIssues.txt
+	elif [[ `cat test28.txt | sed "s/%//g"` -gt 90 ]]
 	then
-	echo -e "{color:red}${R}Disk Space is above 75% on /dev/xvd for instance $i, Please remove unnecessary files before performing Minty upgrade${NC}\n{color}"  >> diskSpaceIssues.txt
+	echo -e "{color:red}${R}Disk Space is above 90% on /dev/xvd for instance $i, Please remove unnecessary files before performing Minty upgrade${NC}\n{color}"  >> diskSpaceIssues.txt
 	fi
 	rm -rf test26.txt
 	rm -rf test27.txt
 	rm -rf test28.txt
 	done
 }
-echo -e "${BL}Refreshing Stack $stack..."
+echo -e "${BL}Refreshing Stack $stack and adding keys to the stack..."
 /${HOME}/cloud/${AWS_KEY_NAME}/cloud-ops/ansible/hosts --refresh-cache --stack "$stack" | grep "$stack.splunkcloud.com" | sed "s/\"//g" | sed "s/,//g" | sed '/tag_FQDN_/d' | sed '/ec2_tag_FQDN/d' | sed '/: {/d' | sort -u | tr -d ' ' | awk '!a[$0]++' > test23.txt
+ad="$(whoami)"
+ansible-playbook stack_add_self.yml -e "stack="$stack" ops_users="$ad"" >> /dev/null
 echo -e "*Preflight Checks*:\n"
 echo -e "${R}1) *Smoke Test Result*:${NC}"
 echo "{code:java}"
@@ -84,8 +86,6 @@ echo -e "ansible 'tag_Stack_${stack}' --extra-vars "@./secure_vars/tag_Stack_"$(
 ansible 'tag_Stack_'"$(echo $stack)"'' --extra-vars "@./secure_vars/tag_Stack_"$(echo $stack)"/secure.yml" -m shell -a '/opt/splunk/bin/splunk search "index=_fake et=-m lt=now" -auth admin:{{ stack_password }}' --sudo -U splunk
 echo -e "{code}\n"
 echo -e "${R}6) *Premium Apps Status*:${NC}"
-ad="$(whoami)"
-ansible-playbook stack_add_self.yml -e "stack="$stack" ops_users="$ad"" >> /dev/null
 	FLAG=n;	ES_FLAG=n; ITSI_FLAG=n; EX_FLAG=n; VM_FLAG=n;
 	#ES
 	ansible 'tag_Stack_'"$(echo $stack)"'' -m shell -a "ls -la /opt/splunk/etc/apps/ | grep "SplunkEnterpriseSecuritySuite"" --sudo -U splunk -l "sh*" | sed '/FAILED | rc=true/d' | sed '/FAILED/d' | sed '/^$/d'| sed 's/ | success | rc=false >>/ /g'| sed '/splunk splunk/d' | sed "s/.${stack}.splunkcloud.com//g" | sed "s/| success | rc=0 >>//g" | sed "s/ //g" > es.txt
